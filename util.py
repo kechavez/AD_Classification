@@ -94,7 +94,7 @@ def ps_tadpole2(raw_data, train_split):
   xnum= xnum.apply(pd.to_numeric, errors='coerce')
   xnum = xnum.dropna()
   # xnum = xnum.dropna(axis='columns')
-  print('xn', xnum)
+  # print('xn', xnum)
   
   le = preprocessing.LabelEncoder()
   x=xnum
@@ -111,3 +111,20 @@ def ps_tadpole2(raw_data, train_split):
                    y.iloc[int(m*train_split)+1:m-1,:].as_matrix().T[0]
 
   return x_train, y_train, x_test, y_test
+
+
+def ps2(raw_data, train_split):
+  y_p = raw_data[['DX']]
+  xnum = raw_data.drop(['DX'], axis=1)
+  xnum= xnum.apply(pd.to_numeric, errors='coerce')
+  xnum = xnum.dropna()
+  # xnum = xnum.dropna(axis='columns')
+  # print('xn', xnum)
+  
+  le = preprocessing.LabelEncoder()
+  x=xnum
+  
+  # Converting 'Group' (Demented or Nondemented) from numerical to categorical value
+  y=y_p.apply(le.fit_transform) # 0: Converted; 1: Demented; 2: Nondemented
+  
+  return x,y
