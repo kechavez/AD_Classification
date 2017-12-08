@@ -106,9 +106,9 @@ def ps_tadpole2(raw_data, train_split):
   m=x.shape[0]    # number of data points
   
   x_train, y_train = x.iloc[0:int(m*train_split),:].as_matrix(), \
-                     y.iloc[0:int(m*train_split),:].as_matrix().T[0]
+                     y.iloc[0:int(m*train_split),:].as_matrix().T[0] # NOTE T[0]
   x_test, y_test = x.iloc[int(m*train_split)+1:m-1,:].as_matrix(), \
-                   y.iloc[int(m*train_split)+1:m-1,:].as_matrix().T[0]
+                   y.iloc[int(m*train_split)+1:m-1,:].as_matrix().T[0] # NOTE T[0]
 
   return x_train, y_train, x_test, y_test
 
