@@ -128,3 +128,14 @@ def ps2(raw_data, train_split):
   y=y_p.apply(le.fit_transform) # 0: Converted; 1: Demented; 2: Nondemented
   
   return x,y
+
+def collapse_dx(raw_data):
+  ret = pd.DataFrame.copy(raw_data)
+  ret = ret[ret['DX'] != 'NL to MCI']
+  ret = ret[ret['DX'] != 'MCI to NL']
+
+  if 'DX' in ret:
+    ret['DX'][ret['DX'] == 'MCI to Dementia'] = 'Dementia'
+    ret['DX'][ret['DX'] == 'MCI'] = 'Dementia'
+
+  return ret
