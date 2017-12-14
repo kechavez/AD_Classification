@@ -8,6 +8,7 @@ from sklearn import preprocessing
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import KFold
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
@@ -94,7 +95,6 @@ def ps_tadpole(raw_data, train_split):
 
   return x_train, y_train, x_test, y_test
 
-# def ps_tadpole2(raw_data, train_split):
 def preprocess_volumetric(raw_data, train_split):
   y_p = raw_data[['DX']]
   xnum = raw_data.drop(['DX'], axis=1)
@@ -122,6 +122,7 @@ def preprocess_volumetric(raw_data, train_split):
 def preprocess_all_feat(raw_data):
   # Drop missing values
   raw_data_cleaned=raw_data.dropna(how='any')
+  # print('rawsize', raw_data_cleaned.shape)
 
   #raw_data_cleaned=raw_data_cleaned[(raw_data_cleaned!=' ').all(1)]
 
@@ -130,17 +131,26 @@ def preprocess_all_feat(raw_data):
   raw_data_cleaned= binary_only_dx(raw_data_cleaned)
 
   # Set some features as categorical
-  xcat_p = raw_data_cleaned[['PTGENDER','PTMARRY','APOE4']]
-  raw_data_cleaned.drop(['PTGENDER','PTMARRY','APOE4'], axis=1, inplace=True)
-  #PTGENDER: 0:Female; 1: Male -- #PTMARRY: 0:Divorced; 1: Married; 2: Never Married 4:Widowed
+  drop = [d for d in ['PTGENDER','PTMARRY','APOE4'] if d in raw_data_cleaned]
+  dropped = False
+  xcat_p = None
+  if len(drop) != 0:
+    dropped = True
+    xcat_p = raw_data_cleaned[drop]
+    raw_data_cleaned.drop(drop, axis=1, inplace=True)
+    #PTGENDER: 0:Female; 1: Male -- #PTMARRY: 0:Divorced; 1: Married; 2: Never Married 4:Widowed
 
   y_p = raw_data_cleaned[['DX']]
   raw_data_cleaned.drop(['DX'], axis=1, inplace=True)
   #DX: 0: Dementia, 1:Normal
 
   le = preprocessing.LabelEncoder()
-  xcat=xcat_p.apply(le.fit_transform)
-  x=pd.concat([xcat,raw_data_cleaned],axis=1,join='inner')
+  x = None
+  if dropped:
+    xcat=xcat_p.apply(le.fit_transform)
+    x=pd.concat([xcat,raw_data_cleaned],axis=1,join='inner')
+  else:
+    x = raw_data_cleaned
 
   # Set 'DX' (Demented or Not) as categorical
   y=y_p.apply(le.fit_transform)
@@ -198,60 +208,63 @@ def collapse_dx(raw_data):
 
   return ret
 
-def binary_only_dx(raw_data):
+def binary_only_dx(raw_data, to='Dementia'):
   ret = pd.DataFrame.copy(raw_data)
   # ret = ret[ret['DX'] != 'NL to MCI']
-  # ret = ret[ret['DX'] != 'MCI to NL']
-  # ret = ret[ret['DX'] != 'MCI to Dementia']
 
-  # ret = ret[ret['DX'] != 'MCI']
-
-  _to = 'Dementia'
-  ret = ret.replace('MCI to Dementia', 'Dementia')
+  ret = ret.replace('MCI to Dementia', 'Dementia') 
+  ret = ret.replace('Dementia to MCI', 'Dementia')
   ret = ret.replace('MCI to NL', 'NL')
   ret = ret.replace('NL to MCI', 'NL')
-  ret = ret.replace('MCI', 'Demenita')
+  ret = ret.replace('MCI', to)
 
   return ret
 
 
-def hold_out_CV(x, y, svc='linear', svmc=1.0):
-    splits=50
-    rs = ShuffleSplit(n_splits=splits, test_size=.3, random_state=0)
-    sum_train =0;
-    sum_test = 0;
-    for train_index, test_index in rs.split(x):
-        x_pca_train,x_lda_train, x_pca_test, x_lda_test = \
+# def hold_out_CV(x, y, svc='linear', svmc=1.0):
+def kfold_CV(models, x, y, k=10):
+    # splits=50
+    # rs = ShuffleSplit(n_splits=splits, test_size=.3, random_state=0)
+    rs = KFold(k, shuffle=True, random_state=0)
+
+
+    for name, model in models.items():
+      print('\n\nModel: ', name)
+      sum_train = 0
+      sum_dev_test = 0
+      for train_index, dev_test_index in rs.split(x):
+        x_pca_train,x_lda_train, x_pca_dev_test, x_lda_dev_test = \
           run_PCA_LDA(x.iloc[train_index],y.iloc[train_index], \
-                      x.iloc[test_index], components=10)
+                      x.iloc[dev_test_index], components=10)
 
-        print('\nxltr', x_lda_train.shape, 'ylte', y.iloc[test_index].shape)
-        print('y.iloc[test_index]', (y.iloc[test_index]==1).size)
+        # print('ytable', y.iloc[dev_test_index])
+        # print (y.iloc[dev_test_index].size, 'devy', np.sum(y.iloc[dev_test_index]['DX'] == 0)) 
+        # print (y.iloc[train_index].size, 'trainy', np.sum(y.iloc[train_index]['DX'] == 0)) 
 
-        svm_model = None
-        if svc == 'linear':
-          svm_model = \
-              LinearSVC(verbose=2, max_iter=1000000, dual=False, C=svmc)# , penalty='l1')
-        else:
-          svm_model = svm.SVC(kernel=svc, C=svmc, max_iter=10000000)
+        # svm_model = None
+        # if svc == 'linear':
+        #   svm_model = \
+        #       LinearSVC(verbose=2, max_iter=1000000, dual=False, C=svmc)# , penalty='l1')
+        # else:
+        #   svm_model = svm.SVC(kernel=svc, C=svmc, max_iter=10000000)
 
-        svm_model.fit(x_lda_train, y.iloc[train_index])
+        model.fit(x_lda_train, y.iloc[train_index])
 
-        predicted_labels = svm_model.predict(x_lda_test)
+        predicted_labels = model.predict(x_lda_dev_test)
         training_score = \
-           accuracy_score(y.iloc[train_index], svm_model.predict(x_lda_train))
-        testing_score = accuracy_score(y.iloc[test_index], predicted_labels)
+           accuracy_score(y.iloc[train_index], model.predict(x_lda_train))
+        dev_testing_score = accuracy_score(y.iloc[dev_test_index], predicted_labels)
 
-        cnf_matrix=confusion_matrix(y.iloc[test_index], predicted_labels)
+        cnf_matrix=confusion_matrix(y.iloc[dev_test_index], predicted_labels)
         class_names=list(['Dementia','NL'])
         # plot_confusion_matrix(cnf_matrix, classes=class_names, title='Confusion matrix')
 
         sum_train = sum_train + training_score;
-        sum_test = sum_test + testing_score;
-        print('train score', training_score, ' test score', testing_score)
+        sum_dev_test = sum_dev_test + dev_testing_score;
+        # print('train score', training_score, ' dev test score', dev_testing_score)
 
-    print("\n\nAverage Training Score : ", sum_train/splits)
-    print("Average Testing Score : ", sum_test/splits)
+      print("Average Training Score : ", sum_train/k)
+      print("Average Dev Testing Score : ", sum_dev_test/k)
 
 def run_PCA_LDA(X,y,xtest,components):
     y=np.ravel(y)
