@@ -221,7 +221,12 @@ def binary_only_dx(raw_data, to='Dementia'):
   return ret
 
 
-# def hold_out_CV(x, y, svc='linear', svmc=1.0):
+# K-fold Cross Validation
+# models: dictionary mapping names to estimators.
+#         e.g. { 'Linear SVM': LinearSVC(max_iter=1000000, dual=False, C=1.0) }
+# x: feature data
+# y: corresponding labeling data
+# k: number of folds
 def kfold_CV(models, x, y, k=10):
     # splits=50
     # rs = ShuffleSplit(n_splits=splits, test_size=.3, random_state=0)
@@ -236,17 +241,6 @@ def kfold_CV(models, x, y, k=10):
         x_pca_train,x_lda_train, x_pca_dev_test, x_lda_dev_test = \
           run_PCA_LDA(x.iloc[train_index],y.iloc[train_index], \
                       x.iloc[dev_test_index], components=10)
-
-        # print('ytable', y.iloc[dev_test_index])
-        # print (y.iloc[dev_test_index].size, 'devy', np.sum(y.iloc[dev_test_index]['DX'] == 0)) 
-        # print (y.iloc[train_index].size, 'trainy', np.sum(y.iloc[train_index]['DX'] == 0)) 
-
-        # svm_model = None
-        # if svc == 'linear':
-        #   svm_model = \
-        #       LinearSVC(verbose=2, max_iter=1000000, dual=False, C=svmc)# , penalty='l1')
-        # else:
-        #   svm_model = svm.SVC(kernel=svc, C=svmc, max_iter=10000000)
 
         model.fit(x_lda_train, y.iloc[train_index])
 
