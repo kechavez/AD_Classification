@@ -208,30 +208,28 @@ def collapse_dx(raw_data):
 
   return ret
 
-def binary_only_dx(raw_data, to='Dementia'):
+def binary_only_dx(raw_data, mci_to='Dementia'):
   ret = pd.DataFrame.copy(raw_data)
-  # ret = ret[ret['DX'] != 'NL to MCI']
+
+  ret = ret[ret['DX'] != 'NL to Dementia']
 
   ret = ret.replace('MCI to Dementia', 'Dementia') 
   ret = ret.replace('Dementia to MCI', 'Dementia')
   ret = ret.replace('MCI to NL', 'NL')
   ret = ret.replace('NL to MCI', 'NL')
-  ret = ret.replace('MCI', to)
+  ret = ret.replace('MCI', mci_to)
 
   return ret
 
 
-# K-fold Cross Validation
+# Reports K-fold Cross Validation Results.
 # models: dictionary mapping names to estimators.
 #         e.g. { 'Linear SVM': LinearSVC(max_iter=1000000, dual=False, C=1.0) }
 # x: feature data
 # y: corresponding labeling data
 # k: number of folds
-def kfold_CV(models, x, y, k=10):
-    # splits=50
-    # rs = ShuffleSplit(n_splits=splits, test_size=.3, random_state=0)
-    rs = KFold(k, shuffle=True, random_state=0)
-
+def kfold_CV(models, x, y, k=10, seed=1):
+    rs = KFold(k, shuffle=True, random_state=seed)
 
     for name, model in models.items():
       print('\n\nModel: ', name)
@@ -249,10 +247,6 @@ def kfold_CV(models, x, y, k=10):
            accuracy_score(y.iloc[train_index], model.predict(x_lda_train))
         dev_testing_score = accuracy_score(y.iloc[dev_test_index], predicted_labels)
 
-        cnf_matrix=confusion_matrix(y.iloc[dev_test_index], predicted_labels)
-        class_names=list(['Dementia','NL'])
-        # plot_confusion_matrix(cnf_matrix, classes=class_names, title='Confusion matrix')
-
         sum_train = sum_train + training_score;
         sum_dev_test = sum_dev_test + dev_testing_score;
         # print('train score', training_score, ' dev test score', dev_testing_score)
@@ -260,9 +254,23 @@ def kfold_CV(models, x, y, k=10):
       print("Average Training Score : ", sum_train/k)
       print("Average Dev Testing Score : ", sum_dev_test/k)
 
+def retrain_and_test_best_result(model, x, y, xtest, ytest):
+    x_pca_train, x_lda_train, x_pca_test, x_lda_test = \
+      run_PCA_LDA(x, y, xtest, components=10)
+
+    model.fit(x_lda_train, y)
+
+    predicted_labels = model.predict(x_lda_test)
+    test_score = accuracy_score(ytest, predicted_labels)
+    print('Best accuracy is: ', test_score)
+
+    cnf_matrix=confusion_matrix(ytest, predicted_labels)
+    class_names=list(['Dementia','NL'])
+    plot_confusion_matrix(cnf_matrix, classes=class_names, title='Confusion matrix')
+
 def run_PCA_LDA(X,y,xtest,components):
     y=np.ravel(y)
-    target_names = ['Dementia', 'NL'] # 'MCI','NL','MCI to Dementia']
+    target_names = ['Dementia', 'NL']
 
     pca = PCA(n_components=components)
     pca1 =  pca.fit(X)
@@ -272,31 +280,7 @@ def run_PCA_LDA(X,y,xtest,components):
     lda = LinearDiscriminantAnalysis(n_components=10)
     lda1= lda.fit(X, y)
     X_r2 = lda1.transform(X)
-    # print('xr2', X_r2.shape)
     Xtest_r2 = lda1.transform(xtest)
-
-    # Percentage of variance explained for each component
-    # print('explained variance ratio (first two components): %s'
-    #       % str(pca.explained_variance_ratio_))
-
-    # plt.figure()
-    # colors = ['navy', 'turquoise'] #, 'darkorange']
-    # lw = 2
-
-    # for color, i, target_name in zip(colors, [0, 1], target_names):
-    #     plt.scatter(X_r[y == i, 0], X_r[y == i, 1], color=color, alpha=.8, lw=lw,
-    #                 label=target_name)
-    # plt.legend(loc='best', shadow=False, scatterpoints=1)
-    # plt.title('PCA of Tadpole dataset')
-
-    # plt.figure()
-    # for color, i, target_name in zip(colors, [0, 1], target_names):
-    #     plt.scatter(X_r2[y == i, 0], X_r2[y == i, 1], alpha=.8, color=color,
-    #                 label=target_name)
-    # plt.legend(loc='best', shadow=False, scatterpoints=1)
-    # plt.title('LDA of Tadpole dataset')
-
-    # plt.show()
 
     x_pca=pd.DataFrame(X_r)
     x_lda=pd.DataFrame(X_r2)
